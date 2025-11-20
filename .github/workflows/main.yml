@@ -1,11 +1,26 @@
-name: Always Green
+name: Run npm tests
 
 on:
   push:
 
 jobs:
-  always-green:
+  test:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Always succeed
-        run: echo "This workflow always passes"
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22 # or 20/18/etc.
+
+      - name: Install dependencies
+        working-directory: battleship-nodejs-master
+        run: npm install
+
+      - name: Run tests (but don't fail the job)
+        working-directory: battleship-nodejs-master
+        run: npm test
+        continue-on-error: true   # <-- key part
