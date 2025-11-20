@@ -18,16 +18,6 @@ const GRID_THEME = {
 };
 
 class Battleship {
-    static Sleep(ms) {
-        if (!Number.isFinite(ms) || ms <= 0) {
-            return;
-        }
-
-        const buffer = new SharedArrayBuffer(4);
-        const view = new Int32Array(buffer);
-        Atomics.wait(view, 0, 0, ms);
-    }
-
     ShowRemainingShips(fleet) {
         console.log("\nRemaining ships:");
 
@@ -116,30 +106,6 @@ class Battleship {
         }
     }
 
-    PlayShotAnimation(targetLabel, attackerLabel = 'Player') {
-        if (!targetLabel) {
-            return;
-        }
-
-        const totalSteps = 12;
-        const prefix = `${attackerLabel} fires at ${targetLabel} `;
-
-        console.log();
-        process.stdout.write(prefix);
-
-        for (let i = 0; i <= totalSteps; i++) {
-            const traveled = '-'.repeat(i);
-            const remaining = ' '.repeat(Math.max(totalSteps - i, 0));
-            const frame = `[${traveled}>${remaining}]`;
-            process.stdout.write(`\r${prefix}${frame}`);
-            Battleship.Sleep(60);
-        }
-
-        process.stdout.write(`\r${prefix}[impact!]`);
-        Battleship.Sleep(150);
-        process.stdout.write('\n');
-    }
-
     start() {
         telemetryWorker = new Worker("./TelemetryClient/telemetryClient.js");   
 
@@ -196,8 +162,6 @@ class Battleship {
             let sunkShip = result.sunkShip;
             this.playerShots.push({ column: position.column, row: position.row, isHit });
 
-            this.PlayShotAnimation(position.toString());
-
             if (sunkShip) {
                 console.log(cliColor.red("\nYou have sunk an enemy ship!"));
                 console.log(cliColor.red(`→ ${sunkShip.name}`));
@@ -222,7 +186,6 @@ class Battleship {
             this.PrintPlayingField(this.playerShots);
 
             var computerPos = this.GetRandomPosition();
-            this.PlayShotAnimation(computerPos.toString(), 'Computer');
 
             let resultComputer = gameController.CheckIsHit(this.myFleet, computerPos);
 
