@@ -20,11 +20,21 @@ class GameController {
         var returnvalue = false;
         ships.forEach(function (ship) {
             ship.positions.forEach(position => {
-                if (position.row == shot.row && position.column == shot.column)
+                if (position.row == shot.row && position.column == shot.column) {
+                    position.isHit = true;
                     returnvalue = true;
+                }
             });
         });
         return returnvalue;
+    }
+
+    static checkWinningCondition(ships) {
+        return ships.every(function (ship) {
+            return ship.positions.every(position => {
+                return position.isHit;
+            });
+        });
     }
 
     static isShipValid(ship) {

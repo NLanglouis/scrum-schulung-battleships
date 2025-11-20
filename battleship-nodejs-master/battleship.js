@@ -46,6 +46,7 @@ class Battleship {
         console.log("   \\    \\_/");
         console.log("    \"\"\"\"");
 
+        let hasSomeoneWon = false;
         do {
             console.log();
             console.log("Player, it's your turn");
@@ -89,8 +90,18 @@ class Battleship {
                 console.log("                 -\\  \\     /  /-");
                 console.log("                   \\  \\   /  /");
             }
+            let hasTheAiWon = gameController.checkWinningCondition(this.myFleet);
+            let hasHumanityWon = gameController.checkWinningCondition(this.enemyFleet);
+            if(hasTheAiWon) {
+                console.log("YOU LOST");
+                hasSomeoneWon = true;
+            }
+            if(hasHumanityWon) {
+                console.log("YOU WON");
+                hasSomeoneWon = true;
+            }
         }
-        while (true);
+        while (!hasSomeoneWon);
     }
 
     static ParsePosition(input) {
@@ -123,10 +134,10 @@ class Battleship {
             console.log();
             console.log(`Please enter the positions for the ${ship.name} (size: ${ship.size})`);
             for (var i = 1; i < ship.size + 1; i++) {
-                    console.log(`Enter position ${i} of ${ship.size} (i.e A3):`);
-                    const position = readline.question();
-                    telemetryWorker.postMessage({eventName: 'Player_PlaceShipPosition', properties:  {Position: position, Ship: ship.name, PositionInShip: i}});
-                    ship.addPosition(Battleship.ParsePosition(position));
+                console.log(`Enter position ${i} of ${ship.size} (i.e A3):`);
+                const position = readline.question();
+                telemetryWorker.postMessage({eventName: 'Player_PlaceShipPosition', properties:  {Position: position, Ship: ship.name, PositionInShip: i}});
+                ship.addPosition(Battleship.ParsePosition(position));
             }
         })
     }

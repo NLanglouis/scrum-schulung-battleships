@@ -1,7 +1,8 @@
 class Position {
-    constructor(column, row) {
+    constructor(column, row, isHit = false) {
         this.column = column;
         this.row = row;
+        this.isHit = isHit;
     }
 
     toString() {
