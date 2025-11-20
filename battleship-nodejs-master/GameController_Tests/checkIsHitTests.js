@@ -15,8 +15,6 @@ describe('checkIsHitTests', function () {
       counter++;
     })
     var actual = gameController.CheckIsHit(ships, new position(letters.B, 3));
-    console.log("EEEEEE", actual)
-    
     assert.ok(actual);
   });
 
@@ -30,7 +28,8 @@ describe('checkIsHitTests', function () {
       counter++;
     })
     var actual = gameController.CheckIsHit(ships, new position(letters.G, 1));
-    assert.strictEqual(actual, false);
+    console.log(actual)
+    assert.deepStrictEqual(actual, { isHit: false, sunkShip: null });
   });
 
   it('should throw an exception if positstion is undefined', function () {
