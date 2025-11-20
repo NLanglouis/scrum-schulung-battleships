@@ -17,30 +17,42 @@ class GameController {
             throw "The shooting position is not defined";
         if (!ships)
             throw "No ships defined";
-
         let hitShip = null;
-
-        ships.forEach(ship => {
-            ship.positions.forEach(pos => {
-                if (pos.row === shot.row && pos.column === shot.column) {
-                    pos.isHit = true;
-                    hitShip = ship;
+        ships.forEach(function (ship) {
+            ship.positions.forEach(position => {
+                if (position.row == shot.row && position.column == shot.column) {
+                    position.isHit = true;
                 }
+
+
+                ships.forEach(ship => {
+                    ship.positions.forEach(pos => {
+                        if (pos.row === shot.row && pos.column === shot.column) {
+                            pos.isHit = true;
+                            hitShip = ship;
+                        }
+                    });
+                });
+
             });
         });
-
         if (!hitShip)
             return { isHit: false, sunkShip: null };
 
         const allHit = hitShip.positions.every(p => p.isHit);
-
         return {
             isHit: true,
             sunkShip: allHit ? hitShip : null
         };
     }
 
-
+    static checkWinningCondition(ships) {
+        return ships.every(function (ship) {
+            return ship.positions.every(position => {
+                return position.isHit;
+            });
+        });
+    }
     static isShipValid(ship) {
         return ship.positions.length == ship.size;
     }
