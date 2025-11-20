@@ -187,11 +187,6 @@ class Battleship {
             console.log(`Please enter the positions for the ${ship.name} (size: ${ship.size})`);
             for (var i = 1; i < ship.size + 1; i++) {
                 console.log(`Enter position ${i} of ${ship.size} (i.e A3):`);
-                const position = readline.question();
-                telemetryWorker.postMessage({eventName: 'Player_PlaceShipPosition', properties:  {Position: position, Ship: ship.name, PositionInShip: i}});
-                ship.addPosition(Battleship.ParsePosition(position));
-                    console.log(`Enter position ${i} of ${ship.size} (i.e A3):`);
-
                     let validPosition;
                     while (true) {
                         const input = readline.question();
