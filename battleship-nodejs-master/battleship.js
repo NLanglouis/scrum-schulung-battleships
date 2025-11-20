@@ -8,6 +8,10 @@ const letters = require("./GameController/letters.js");
 let telemetryWorker;
 
 class Battleship {
+    constructor() {
+        this.computerShotPositions = new Set(); // Tracking für Computer-Schüsse
+    }
+
     ShowRemainingShips(fleet) {
         console.log("\nRemaining ships:");
 
@@ -22,7 +26,8 @@ class Battleship {
     }
 
     start() {
-        telemetryWorker = new Worker("./TelemetryClient/telemetryClient.js");   
+        telemetryWorker = new Worker("./TelemetryClient/telemetryClient.js");
+        this.computerShotPositions = new Set(); // Initialisierung
 
         console.log("Starting...");
         telemetryWorker.postMessage({eventName: 'ApplicationStarted', properties:  {Technology: 'Node.js'}});
@@ -102,8 +107,10 @@ class Battleship {
 
             console.log(isHit ? "Yeah ! Nice hit !" : "Miss");
 
+            // KORRIGIERT: Computer-Schuss mit Duplikat-Prüfung
             var computerPos = this.GetRandomPosition();
             let resultComputer = gameController.CheckIsHit(this.myFleet, computerPos);
+            let computerIsHit = resultComputer.isHit; // Eigene Variable für Computer-Treffer
 
             if (resultComputer.sunkShip) {
                 console.log(cliColor.red("\nThe computer has sunk one of your ships :("));
@@ -111,11 +118,12 @@ class Battleship {
                 this.ShowRemainingShips(this.myFleet);
             }
 
-            telemetryWorker.postMessage({eventName: 'Computer_ShootPosition', properties:  {Position: computerPos.toString(), IsHit: isHit}});
+            // KORRIGIERT: Verwendet jetzt computerIsHit statt isHit
+            telemetryWorker.postMessage({eventName: 'Computer_ShootPosition', properties:  {Position: computerPos.toString(), IsHit: computerIsHit}});
 
             console.log();
-            console.log(`Computer shot in ${computerPos.column}${computerPos.row} and ` + (isHit ? `has hit your ship !` : `miss`));
-            if (isHit) {
+            console.log(`Computer shot in ${computerPos.column}${computerPos.row} and ` + (computerIsHit ? `has hit your ship !` : `miss`));
+            if (computerIsHit) {
                 beep();
 
                 console.log("                \\         .  ./");
@@ -162,14 +170,43 @@ class Battleship {
         return new position(letter, number);
     }
 
+    // KOMPLETT ÜBERARBEITET: Generiert nur noch 1-8 und vermeidet Duplikate
     GetRandomPosition() {
-        var rows = 8;
-        var lines = 8;
-        var rndColumn = Math.floor((Math.random() * lines));
-        var letter = letters.get(rndColumn + 1);
-        var number = Math.floor((Math.random() * rows));
-        var result = new position(letter, number);
-        return result;
+        const rows = 8;
+        const lines = 8;
+        const maxAttempts = 100;
+        let attempts = 0;
+
+        while (attempts < maxAttempts) {
+            // KORRIGIERT: Generiert jetzt 1-8 für beide Achsen
+            const rndColumn = Math.floor(Math.random() * lines) + 1; // 1-8
+            const rndRow = Math.floor(Math.random() * rows) + 1;     // 1-8
+
+            const letter = letters.get(rndColumn);
+            const posKey = `${letter}${rndRow}`;
+
+            // Prüfen ob Position bereits beschossen wurde
+            if (!this.computerShotPositions.has(posKey)) {
+                this.computerShotPositions.add(posKey);
+                return new position(letter, rndRow);
+            }
+
+            attempts++;
+        }
+
+        // Fallback: Systematische Suche nach freier Position
+        for (let col = 1; col <= lines; col++) {
+            for (let row = 1; row <= rows; row++) {
+                const letter = letters.get(col);
+                const posKey = `${letter}${row}`;
+                if (!this.computerShotPositions.has(posKey)) {
+                    this.computerShotPositions.add(posKey);
+                    return new position(letter, row);
+                }
+            }
+        }
+
+        throw new Error("No valid positions remaining");
     }
 
     InitializeGame() {
@@ -187,50 +224,51 @@ class Battleship {
             console.log(`Please enter the positions for the ${ship.name} (size: ${ship.size})`);
             for (var i = 1; i < ship.size + 1; i++) {
                 console.log(`Enter position ${i} of ${ship.size} (i.e A3):`);
-                const position = readline.question();
-                telemetryWorker.postMessage({eventName: 'Player_PlaceShipPosition', properties:  {Position: position, Ship: ship.name, PositionInShip: i}});
-                ship.addPosition(Battleship.ParsePosition(position));
-                    console.log(`Enter position ${i} of ${ship.size} (i.e A3):`);
-
-                    let validPosition;
-                    while (true) {
-                        const input = readline.question();
-                        try {
-                            validPosition = Battleship.ParsePosition(input);
-                            telemetryWorker.postMessage({eventName: 'Player_PlaceShipPosition', properties:  {Position: input, Ship: ship.name, PositionInShip: i}});
-                            break;
-                        } catch (e) {
-                            console.error(cliColor.red("This position is outside of the game board (A-H and 1-8) or invalid. Please enter a valid position:"));
-                        }
+                let validPosition;
+                while (true) {
+                    const input = readline.question();
+                    try {
+                        validPosition = Battleship.ParsePosition(input);
+                        telemetryWorker.postMessage({eventName: 'Player_PlaceShipPosition', properties:  {Position: input, Ship: ship.name, PositionInShip: i}});
+                        break;
+                    } catch (e) {
+                        console.error(cliColor.red("This position is outside of the game board (A-H and 1-8) or invalid. Please enter a valid position:"));
                     }
+                }
 
-                    ship.addPosition(validPosition);
+                ship.addPosition(validPosition);
             }
         })
     }
 
+    // KORRIGIERT: Position E9 wurde durch E5 ersetzt
     InitializeEnemyFleet() {
         this.enemyFleet = gameController.InitializeShips();
 
+        // Aircraft Carrier (5 Felder)
         this.enemyFleet[0].addPosition(new position(letters.B, 4));
         this.enemyFleet[0].addPosition(new position(letters.B, 5));
         this.enemyFleet[0].addPosition(new position(letters.B, 6));
         this.enemyFleet[0].addPosition(new position(letters.B, 7));
         this.enemyFleet[0].addPosition(new position(letters.B, 8));
 
+        // Battleship (4 Felder) - KORRIGIERT: E9 → E5
+        this.enemyFleet[1].addPosition(new position(letters.E, 5));
         this.enemyFleet[1].addPosition(new position(letters.E, 6));
         this.enemyFleet[1].addPosition(new position(letters.E, 7));
         this.enemyFleet[1].addPosition(new position(letters.E, 8));
-        this.enemyFleet[1].addPosition(new position(letters.E, 9));
 
+        // Submarine (3 Felder)
         this.enemyFleet[2].addPosition(new position(letters.A, 3));
         this.enemyFleet[2].addPosition(new position(letters.B, 3));
         this.enemyFleet[2].addPosition(new position(letters.C, 3));
 
+        // Destroyer (3 Felder)
         this.enemyFleet[3].addPosition(new position(letters.F, 8));
         this.enemyFleet[3].addPosition(new position(letters.G, 8));
         this.enemyFleet[3].addPosition(new position(letters.H, 8));
 
+        // Patrol Boat (2 Felder)
         this.enemyFleet[4].addPosition(new position(letters.C, 5));
         this.enemyFleet[4].addPosition(new position(letters.C, 6));
     }
