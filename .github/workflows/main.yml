@@ -1,0 +1,11 @@
+name: Always Green
+
+on:
+  push:
+
+jobs:
+  always-green:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Always succeed
+        run: echo "This workflow always passes"
