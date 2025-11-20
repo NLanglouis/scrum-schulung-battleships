@@ -51,7 +51,18 @@ class Battleship {
             console.log();
             console.log("Player, it's your turn");
             console.log("Enter coordinates for your shot :");
-            var position = Battleship.ParsePosition(readline.question());
+
+            let position;
+            while (true) {
+                const input = readline.question();
+                try {
+                    position = Battleship.ParsePosition(input);
+                    break;
+                } catch (e) {
+                    console.error(cliColor.red("This position is outside of the game board (A-H and 1-8) or invalid. Please try again:"));
+                }
+            }
+
             var isHit = gameController.CheckIsHit(this.enemyFleet, position);
 
             telemetryWorker.postMessage({eventName: 'Player_ShootPosition', properties:  {Position: position.toString(), IsHit: isHit}});
@@ -105,8 +116,23 @@ class Battleship {
     }
 
     static ParsePosition(input) {
-        var letter = letters.get(input.toUpperCase().substring(0, 1));
-        var number = parseInt(input.substring(1, 2), 10);
+        if (!input || typeof input !== 'string') {
+            throw new Error('Invalid position input');
+        }
+
+        const trimmed = input.trim().toUpperCase();
+
+        // Erlaubt genau: ein Buchstabe A-H + eine Ziffer 1-8
+        if (!/^[A-H][1-8]$/.test(trimmed)) {
+            throw new Error('Position outside of board (A-H and 1-8)');
+        }
+
+        const letterChar = trimmed[0];
+        const numberChar = trimmed[1];
+
+        const letter = letters.get(letterChar);
+        const number = Number(numberChar);
+
         return new position(letter, number);
     }
 
@@ -138,6 +164,21 @@ class Battleship {
                 const position = readline.question();
                 telemetryWorker.postMessage({eventName: 'Player_PlaceShipPosition', properties:  {Position: position, Ship: ship.name, PositionInShip: i}});
                 ship.addPosition(Battleship.ParsePosition(position));
+                    console.log(`Enter position ${i} of ${ship.size} (i.e A3):`);
+
+                    let validPosition;
+                    while (true) {
+                        const input = readline.question();
+                        try {
+                            validPosition = Battleship.ParsePosition(input);
+                            telemetryWorker.postMessage({eventName: 'Player_PlaceShipPosition', properties:  {Position: input, Ship: ship.name, PositionInShip: i}});
+                            break;
+                        } catch (e) {
+                            console.error(cliColor.red("This position is outside of the game board (A-H and 1-8) or invalid. Please enter a valid position:"));
+                        }
+                    }
+
+                    ship.addPosition(validPosition);
             }
         })
     }
