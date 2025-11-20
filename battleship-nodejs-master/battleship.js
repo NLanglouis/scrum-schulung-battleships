@@ -8,6 +8,19 @@ const letters = require("./GameController/letters.js");
 let telemetryWorker;
 
 class Battleship {
+    ShowRemainingShips(fleet) {
+        console.log("\nRemaining ships:");
+
+        fleet.forEach(ship => {
+            const sunk = ship.positions.every(p => p.isHit);
+            if (!sunk) {
+                console.log(cliColor.green(`• ${ship.name}`));
+            }
+        });
+
+        console.log("");
+    }
+
     start() {
         telemetryWorker = new Worker("./TelemetryClient/telemetryClient.js");   
 
@@ -62,8 +75,15 @@ class Battleship {
                 }
             }
 
-            var isHit = gameController.CheckIsHit(this.enemyFleet, position);
+            let result = gameController.CheckIsHit(this.enemyFleet, position);
+            let isHit = result.isHit;
+            let sunkShip = result.sunkShip;
 
+            if (sunkShip) {
+                console.log(cliColor.red("\nYou have sunk an enemy ship!"));
+                console.log(cliColor.red(`→ ${sunkShip.name}`));
+                this.ShowRemainingShips(this.enemyFleet);
+            }
             telemetryWorker.postMessage({eventName: 'Player_ShootPosition', properties:  {Position: position.toString(), IsHit: isHit}});
 
             if (isHit) {
@@ -82,7 +102,13 @@ class Battleship {
             console.log(isHit ? "Yeah ! Nice hit !" : "Miss");
 
             var computerPos = this.GetRandomPosition();
-            isHit = gameController.CheckIsHit(this.myFleet, computerPos);
+            let resultComputer = gameController.CheckIsHit(this.myFleet, computerPos);
+
+            if (resultComputer.sunkShip) {
+                console.log(cliColor.red("\nThe computer has sunk one of your ships :("));
+                console.log(cliColor.red(`→ ${resultComputer.sunkShip.name}`));
+                this.ShowRemainingShips(this.myFleet);
+            }
 
             telemetryWorker.postMessage({eventName: 'Computer_ShootPosition', properties:  {Position: computerPos.toString(), IsHit: isHit}});
 
