@@ -1,5 +1,5 @@
 Feature: IsShipValid
-	In order to avoid cheeting
+	In order to avoid cheating
 	As a player
 	I want to be notified if my ship has a invalid placement
 
