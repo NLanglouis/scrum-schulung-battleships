@@ -7,6 +7,16 @@ const position = require("./GameController/position.js");
 const letters = require("./GameController/letters.js");
 let telemetryWorker;
 
+// High-contrast palette keeps the grid legible on low-quality projectors.
+const GRID_THEME = {
+    header: label => cliColor.bgBlackBright.whiteBright.bold(` ${label} `),
+    rowLabel: label => cliColor.whiteBright.bold(label),
+    separator: line => cliColor.cyanBright(line),
+    hit: () => cliColor.bgRedBright.whiteBright.bold(' X '),
+    miss: () => cliColor.bgYellowBright.black(' ○ '),
+    water: () => cliColor.bgBlueBright.whiteBright(' ~ ')
+};
+
 class Battleship {
     constructor() {
         this.computerShotPositions = new Set(); // Tracking für Computer-Schüsse
@@ -23,6 +33,81 @@ class Battleship {
         });
 
         console.log("");
+    }
+
+    PrintPlayingField(shots = []) {
+        const columnEntries = Array.from({ length: 8 }, (_, i) => {
+            const label = String.fromCharCode(65 + i);
+            const enumValue = letters.get(i + 1);
+            return { label, enumValue };
+        });
+        const baseSeparator = '   +' + columnEntries.map(() => '---+').join('');
+        const separator = GRID_THEME.separator(baseSeparator);
+
+        console.log("\nCurrent battlefield layout:");
+        console.log('     ' + columnEntries.map(c => GRID_THEME.header(c.label)).join(' '));
+        console.log(separator);
+
+        for (let row = 1; row <= 8; row++) {
+            const paddedRow = row.toString().padStart(2, ' ');
+            const rowCells = columnEntries.map(({ enumValue }) => {
+                const shot = shots.find(s => s.column === enumValue && s.row === row);
+
+                if (shot && shot.isHit) {
+                    return GRID_THEME.hit();
+                }
+
+                if (shot) {
+                    return GRID_THEME.miss();
+                }
+
+                return GRID_THEME.water();
+            }).join('|');
+
+            const styledRowLabel = GRID_THEME.rowLabel(paddedRow);
+            console.log(`${styledRowLabel} |${rowCells}|`);
+            console.log(separator);
+        }
+
+        console.log();
+    }
+
+    ShowInputGuide(title, lines = []) {
+        if (!title) {
+            return;
+        }
+
+        const allLines = [title, ...lines].map(line => line || '');
+        const width = Math.max(...allLines.map(line => line.length));
+        const border = '+' + '-'.repeat(width + 4) + '+';
+        const cyanBorder = cliColor.cyan(border);
+        const gutter = cliColor.cyan('|');
+
+        console.log();
+        console.log(cyanBorder);
+        allLines.forEach((line, index) => {
+            const content = line.padEnd(width, ' ');
+            const coloredContent = index === 0 ? cliColor.whiteBright(content) : cliColor.white(content);
+            console.log(`${gutter}  ${coloredContent}  ${gutter}`);
+        });
+        console.log(cyanBorder);
+    }
+
+    PromptForPosition(title, hints = [], promptLabel = 'Coordinate') {
+        this.ShowInputGuide(title, hints.concat([
+            'Format: <Letter><Number> (example: B4)',
+            'Columns: A-H | Rows: 1-8'
+        ]));
+
+        while (true) {
+            const input = readline.question(cliColor.yellow(`> ${promptLabel}: `));
+
+            try {
+                return Battleship.ParsePosition(input);
+            } catch (e) {
+                console.error(cliColor.red('Invalid input. Please enter a position on the board (A-H with 1-8).'));
+            }
+        }
     }
 
     start() {
@@ -47,6 +132,7 @@ class Battleship {
         console.log(cliColor.magenta(" \\_________________________________________________________________________|"));
         console.log();
 
+        this.PrintPlayingField();
         this.InitializeGame();
         this.StartGame();
     }
@@ -67,23 +153,19 @@ class Battleship {
         let hasSomeoneWon = false;
         do {
             console.log();
-            console.log("Player, it's your turn");
-            console.log("Enter coordinates for your shot :");
-
-            let position;
-            while (true) {
-                const input = readline.question();
-                try {
-                    position = Battleship.ParsePosition(input);
-                    break;
-                } catch (e) {
-                    console.error(cliColor.red("This position is outside of the game board (A-H and 1-8) or invalid. Please try again:"));
-                }
-            }
+            const position = this.PromptForPosition(
+                'Player turn — choose your target',
+                [
+                    `Shots fired so far: ${this.playerShots.length}`,
+                    'Aim carefully to sink the remaining fleet!'
+                ],
+                'Target'
+            );
 
             let result = gameController.CheckIsHit(this.enemyFleet, position);
             let isHit = result.isHit;
             let sunkShip = result.sunkShip;
+            this.playerShots.push({ column: position.column, row: position.row, isHit });
 
             if (sunkShip) {
                 console.log(cliColor.red("\nYou have sunk an enemy ship!"));
@@ -106,9 +188,11 @@ class Battleship {
             }
 
             console.log(isHit ? "Yeah ! Nice hit !" : "Miss");
+            this.PrintPlayingField(this.playerShots);
 
             // KORRIGIERT: Computer-Schuss mit Duplikat-Prüfung
             var computerPos = this.GetRandomPosition();
+
             let resultComputer = gameController.CheckIsHit(this.myFleet, computerPos);
             let computerIsHit = resultComputer.isHit; // Eigene Variable für Computer-Treffer
 
@@ -210,6 +294,7 @@ class Battleship {
     }
 
     InitializeGame() {
+        this.playerShots = [];
         this.InitializeMyFleet();
         this.InitializeEnemyFleet();
     }
@@ -223,54 +308,74 @@ class Battleship {
             console.log();
             console.log(`Please enter the positions for the ${ship.name} (size: ${ship.size})`);
             for (var i = 1; i < ship.size + 1; i++) {
-                console.log(`Enter position ${i} of ${ship.size} (i.e A3):`);
-                let validPosition;
-                while (true) {
-                    const input = readline.question();
-                    try {
-                        validPosition = Battleship.ParsePosition(input);
-                        telemetryWorker.postMessage({eventName: 'Player_PlaceShipPosition', properties:  {Position: input, Ship: ship.name, PositionInShip: i}});
-                        break;
-                    } catch (e) {
-                        console.error(cliColor.red("This position is outside of the game board (A-H and 1-8) or invalid. Please enter a valid position:"));
-                    }
-                }
+                const placementPrompt = `Place section ${i} of ${ship.size} for your ${ship.name}`;
+                let validPosition = this.PromptForPosition(
+                    placementPrompt,
+                    ['Ensure each section is contiguous and does not overlap other ships.'],
+                    'Coordinate'
+                );
+                telemetryWorker.postMessage({eventName: 'Player_PlaceShipPosition', properties:  {Position: validPosition.toString(), Ship: ship.name, PositionInShip: i}});
 
                 ship.addPosition(validPosition);
             }
-        })
+        }, this)
     }
 
     // KORRIGIERT: Position E9 wurde durch E5 ersetzt
-    InitializeEnemyFleet() {
+
+     InitializeEnemyFleet() {
         this.enemyFleet = gameController.InitializeShips();
+        const gridSize = 8;
 
-        // Aircraft Carrier (5 Felder)
-        this.enemyFleet[0].addPosition(new position(letters.B, 4));
-        this.enemyFleet[0].addPosition(new position(letters.B, 5));
-        this.enemyFleet[0].addPosition(new position(letters.B, 6));
-        this.enemyFleet[0].addPosition(new position(letters.B, 7));
-        this.enemyFleet[0].addPosition(new position(letters.B, 8));
+        const usedPositions = new Set();
 
-        // Battleship (4 Felder) - KORRIGIERT: E9 → E5
-        this.enemyFleet[1].addPosition(new position(letters.E, 5));
-        this.enemyFleet[1].addPosition(new position(letters.E, 6));
-        this.enemyFleet[1].addPosition(new position(letters.E, 7));
-        this.enemyFleet[1].addPosition(new position(letters.E, 8));
+        this.enemyFleet.forEach(ship => {
+            let placed = false;
 
-        // Submarine (3 Felder)
-        this.enemyFleet[2].addPosition(new position(letters.A, 3));
-        this.enemyFleet[2].addPosition(new position(letters.B, 3));
-        this.enemyFleet[2].addPosition(new position(letters.C, 3));
+            while (!placed) {
+                const horizontal = Math.random() < 0.5;
 
-        // Destroyer (3 Felder)
-        this.enemyFleet[3].addPosition(new position(letters.F, 8));
-        this.enemyFleet[3].addPosition(new position(letters.G, 8));
-        this.enemyFleet[3].addPosition(new position(letters.H, 8));
+                const startCol = Math.floor(Math.random() * gridSize) + 1;
+                const startRow = Math.floor(Math.random() * gridSize) + 1;
 
-        // Patrol Boat (2 Felder)
-        this.enemyFleet[4].addPosition(new position(letters.C, 5));
-        this.enemyFleet[4].addPosition(new position(letters.C, 6));
+                const positions = [];
+                let valid = true;
+
+                for (let i = 0; i < ship.size; i++) {
+                    let col = startCol;
+                    let row = startRow;
+
+                    if (horizontal) {
+                        col = startCol + i;
+                    } else {
+                        row = startRow + i;
+                    }
+
+                    if (col > gridSize || row > gridSize) {
+                        valid = false;
+                        break;
+                    }
+
+                    const key = `${col}-${row}`;
+
+                    if (usedPositions.has(key)) {
+                        valid = false;
+                        break;
+                    }
+
+                    positions.push({ col, row });
+                }
+
+                if (!valid) continue;
+
+                positions.forEach(p => {
+                    usedPositions.add(`${p.col}-${p.row}`);
+                    ship.addPosition(new position(letters.get(p.col), p.row));
+                });
+
+                placed = true;
+            }
+        });
     }
 }
 
