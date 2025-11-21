@@ -210,7 +210,7 @@ class Battleship {
                 console.log("                 -\\  \\     /  /-");
                 console.log("                   \\  \\   /  /");
             }
-            let hasTheAiWon = gameController.checkWinningCondition(this.enemyFleet);
+            let hasTheAiWon = gameController.checkWinningCondition(this.myFleet);
             let hasHumanityWon = gameController.checkWinningCondition(this.enemyFleet);
             if(hasTheAiWon) {
                 console.log("YOU LOST");
