@@ -10,7 +10,7 @@ let telemetryWorker;
 // High-contrast palette keeps the grid legible on low-quality projectors.
 const GRID_THEME = {
     header: label => cliColor.bgBlackBright.whiteBright.bold(` ${label} `),
-    rowLabel: label => cliColor.whiteBright.bold(label),
+    rowLabel: label => cliColor.bgBlackBright.whiteBright.bold(` ${label} `),
     separator: line => cliColor.cyanBright(line),
     hit: () => cliColor.bgRedBright.whiteBright.bold(' X '),
     miss: () => cliColor.bgYellowBright.black(' ○ '),
