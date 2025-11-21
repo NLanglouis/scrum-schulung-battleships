@@ -20,6 +20,15 @@ const GRID_THEME = {
 class Battleship {
     constructor() {
         this.computerShotPositions = new Set(); // Tracking für Computer-Schüsse
+
+        // Schuss-Historien
+        this.playerShots = [];   // Player vs Computer
+        this.player1Shots = [];  // 1vs1
+        this.player2Shots = [];  // 1vs1
+
+        // Flotten für 1vs1
+        this.player1Fleet = null;
+        this.player2Fleet = null;
     }
 
     ShowRemainingShips(fleet) {
@@ -132,9 +141,21 @@ class Battleship {
         console.log(cliColor.magenta(" \\_________________________________________________________________________|"));
         console.log();
 
-        this.PrintPlayingField();
-        this.InitializeGame();
-        this.StartGame();
+        // Spielmodus auswählen
+        console.log(cliColor.cyan("Select game mode:"));
+        console.log("1) Player vs Computer");
+        console.log("2) Player vs Player (1 vs 1)");
+        const modeInput = readline.question(cliColor.yellow("> Mode (1/2): "));
+        const mode = modeInput.trim() === '2' ? 'pvp' : 'pve';
+
+        if (mode === 'pvp') {
+            this.InitializeTwoPlayerGame();
+            this.StartGameTwoPlayer();
+        } else {
+            this.PrintPlayingField();
+            this.InitializeGame();
+            this.StartGame();
+        }
     }
 
     StartGame() {
@@ -233,6 +254,77 @@ class Battleship {
         while (!hasSomeoneWon);
     }
 
+    StartGameTwoPlayer() {
+        console.clear();
+        let hasSomeoneWon = false;
+        let isPlayer1Turn = true;
+
+        while (!hasSomeoneWon) {
+            const currentPlayerName = isPlayer1Turn ? 'Player 1' : 'Player 2';
+            const shooterShots = isPlayer1Turn ? this.player1Shots : this.player2Shots;
+            const enemyFleet = isPlayer1Turn ? this.player2Fleet : this.player1Fleet;
+
+            console.log(cliColor.cyan(`\n${currentPlayerName}'s turn`));
+            this.PrintPlayingField(shooterShots);
+
+            const position = this.PromptForPosition(
+                `${currentPlayerName} — choose your target`,
+                [
+                    `Shots fired so far: ${shooterShots.length}`,
+                    'Aim carefully to sink the remaining fleet!'
+                ],
+                'Target'
+            );
+
+            const result = gameController.CheckIsHit(enemyFleet, position);
+            const isHit = result.isHit;
+            const sunkShip = result.sunkShip;
+
+            shooterShots.push({ column: position.column, row: position.row, isHit });
+
+            if (sunkShip) {
+                console.log(cliColor.red(`\n${currentPlayerName} has sunk an enemy ship!`));
+                console.log(cliColor.red(`→ ${sunkShip.name}`));
+                this.ShowRemainingShips(enemyFleet);
+            }
+
+            telemetryWorker.postMessage({
+                eventName: 'PvP_ShootPosition',
+                properties: { Player: currentPlayerName, Position: position.toString(), IsHit: isHit }
+            });
+
+            if (isHit) {
+                beep();
+
+                console.log("                \\         .  ./");
+                console.log("              \\      .:\";'.:..\"   /");
+                console.log("                  (M^^.^~~:.'\").");
+                console.log("            -   (/  .    . . \\ \\)  -");
+                console.log("               ((| :. ~ ^  :. .|))");
+                console.log("            -   (\\- |  \\ /  |  /)  -");
+                console.log("                 -\\  \\     /  /-");
+                console.log("                   \\  \\   /  /");
+            }
+
+            console.log(isHit ? "Hit!" : "Miss");
+            this.PrintPlayingField(shooterShots);
+
+            const hasOpponentLost = gameController.checkWinningCondition(enemyFleet);
+            if (hasOpponentLost) {
+                console.log(cliColor.green(`\n${currentPlayerName} WINS!`));
+                hasSomeoneWon = true;
+                break;
+            }
+
+            // Spielerwechsel
+            isPlayer1Turn = !isPlayer1Turn;
+
+            console.log(cliColor.yellow("\nPass the keyboard to the other player and press Enter to continue."));
+            readline.question('');
+            console.clear();
+        }
+    }
+
     static ParsePosition(input) {
         if (!input || typeof input !== 'string') {
             throw new Error('Invalid position input');
@@ -262,7 +354,7 @@ class Battleship {
         let attempts = 0;
 
         while (attempts < maxAttempts) {
-            // KORRIGIERT: Generiert jetzt 1-8 für beide Achsen
+            // KORRIGERT: Generiert jetzt 1-8 für beide Achsen
             const rndColumn = Math.floor(Math.random() * lines) + 1; // 1-8
             const rndRow = Math.floor(Math.random() * rows) + 1;     // 1-8
 
@@ -297,6 +389,46 @@ class Battleship {
         this.playerShots = [];
         this.InitializeMyFleet();
         this.InitializeEnemyFleet();
+    }
+
+    InitializeTwoPlayerGame() {
+        // Schuss-Historien für 1vs1 zurücksetzen
+        this.player1Shots = [];
+        this.player2Shots = [];
+
+        console.log(cliColor.cyan("\nPLAYER 1 - setup phase"));
+        this.player1Fleet = this.InitializeFleetForPlayer('Player 1');
+
+        console.clear();
+        console.log(cliColor.cyan("\nPLAYER 2 - setup phase"));
+        this.player2Fleet = this.InitializeFleetForPlayer('Player 2');
+    }
+
+    InitializeFleetForPlayer(playerLabel) {
+        const fleet = gameController.InitializeShips();
+
+        console.log(`Please position your fleet, ${playerLabel} (Game board size is from A to H and 1 to 8) :`);
+
+        fleet.forEach((ship) => {
+            console.log();
+            console.log(`Please enter the positions for the ${ship.name} (size: ${ship.size})`);
+            for (let i = 1; i < ship.size + 1; i++) {
+                const placementPrompt = `${playerLabel} - place section ${i} of ${ship.size} for your ${ship.name}`;
+                let validPosition = this.PromptForPosition(
+                    placementPrompt,
+                    ['Ensure each section is contiguous and does not overlap other ships.'],
+                    'Coordinate'
+                );
+                telemetryWorker.postMessage({
+                    eventName: 'Player_PlaceShipPosition',
+                    properties: { Player: playerLabel, Position: validPosition.toString(), Ship: ship.name, PositionInShip: i }
+                });
+
+                ship.addPosition(validPosition);
+            }
+        });
+
+        return fleet;
     }
 
     InitializeMyFleet() {
