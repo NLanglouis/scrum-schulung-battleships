@@ -10,7 +10,7 @@ let telemetryWorker;
 // High-contrast palette keeps the grid legible on low-quality projectors.
 const GRID_THEME = {
     header: label => cliColor.bgBlackBright.whiteBright.bold(` ${label} `),
-    rowLabel: label => cliColor.whiteBright.bold(label),
+    rowLabel: label => cliColor.bgBlackBright.whiteBright.bold(` ${label} `),
     separator: line => cliColor.cyanBright(line),
     hit: () => cliColor.bgRedBright.whiteBright.bold(' X '),
     miss: () => cliColor.bgYellowBright.black(' ○ '),
@@ -18,6 +18,10 @@ const GRID_THEME = {
 };
 
 class Battleship {
+    constructor() {
+        this.computerShotPositions = new Set(); // Tracking für Computer-Schüsse
+    }
+
     ShowRemainingShips(fleet) {
         console.log("\nRemaining ships:");
 
@@ -107,7 +111,8 @@ class Battleship {
     }
 
     start() {
-        telemetryWorker = new Worker("./TelemetryClient/telemetryClient.js");   
+        telemetryWorker = new Worker("./TelemetryClient/telemetryClient.js");
+        this.computerShotPositions = new Set(); // Initialisierung
 
         console.log("Starting...");
         telemetryWorker.postMessage({eventName: 'ApplicationStarted', properties:  {Technology: 'Node.js'}});
@@ -185,9 +190,11 @@ class Battleship {
             console.log(isHit ? "Yeah ! Nice hit !" : "Miss");
             this.PrintPlayingField(this.playerShots);
 
+            // KORRIGIERT: Computer-Schuss mit Duplikat-Prüfung
             var computerPos = this.GetRandomPosition();
 
             let resultComputer = gameController.CheckIsHit(this.myFleet, computerPos);
+            let computerIsHit = resultComputer.isHit; // Eigene Variable für Computer-Treffer
 
             if (resultComputer.sunkShip) {
                 console.log(cliColor.red("\nThe computer has sunk one of your ships :("));
@@ -195,11 +202,12 @@ class Battleship {
                 this.ShowRemainingShips(this.myFleet);
             }
 
-            telemetryWorker.postMessage({eventName: 'Computer_ShootPosition', properties:  {Position: computerPos.toString(), IsHit: isHit}});
+            // KORRIGIERT: Verwendet jetzt computerIsHit statt isHit
+            telemetryWorker.postMessage({eventName: 'Computer_ShootPosition', properties:  {Position: computerPos.toString(), IsHit: computerIsHit}});
 
             console.log();
-            console.log(`Computer shot in ${computerPos.column}${computerPos.row} and ` + (isHit ? `has hit your ship !` : `miss`));
-            if (isHit) {
+            console.log(`Computer shot in ${computerPos.column}${computerPos.row} and ` + (computerIsHit ? `has hit your ship !` : `miss`));
+            if (computerIsHit) {
                 beep();
 
                 console.log("                \\         .  ./");
@@ -246,14 +254,43 @@ class Battleship {
         return new position(letter, number);
     }
 
+    // KOMPLETT ÜBERARBEITET: Generiert nur noch 1-8 und vermeidet Duplikate
     GetRandomPosition() {
-        var rows = 8;
-        var lines = 8;
-        var rndColumn = Math.floor((Math.random() * lines));
-        var letter = letters.get(rndColumn + 1);
-        var number = Math.floor((Math.random() * rows));
-        var result = new position(letter, number);
-        return result;
+        const rows = 8;
+        const lines = 8;
+        const maxAttempts = 100;
+        let attempts = 0;
+
+        while (attempts < maxAttempts) {
+            // KORRIGIERT: Generiert jetzt 1-8 für beide Achsen
+            const rndColumn = Math.floor(Math.random() * lines) + 1; // 1-8
+            const rndRow = Math.floor(Math.random() * rows) + 1;     // 1-8
+
+            const letter = letters.get(rndColumn);
+            const posKey = `${letter}${rndRow}`;
+
+            // Prüfen ob Position bereits beschossen wurde
+            if (!this.computerShotPositions.has(posKey)) {
+                this.computerShotPositions.add(posKey);
+                return new position(letter, rndRow);
+            }
+
+            attempts++;
+        }
+
+        // Fallback: Systematische Suche nach freier Position
+        for (let col = 1; col <= lines; col++) {
+            for (let row = 1; row <= rows; row++) {
+                const letter = letters.get(col);
+                const posKey = `${letter}${row}`;
+                if (!this.computerShotPositions.has(posKey)) {
+                    this.computerShotPositions.add(posKey);
+                    return new position(letter, row);
+                }
+            }
+        }
+
+        throw new Error("No valid positions remaining");
     }
 
     InitializeGame() {
@@ -284,7 +321,9 @@ class Battleship {
         }, this)
     }
 
-    InitializeEnemyFleet() {
+    // KORRIGIERT: Position E9 wurde durch E5 ersetzt
+
+     InitializeEnemyFleet() {
         this.enemyFleet = gameController.InitializeShips();
         const gridSize = 8;
 
@@ -338,7 +377,6 @@ class Battleship {
             }
         });
     }
-
 }
 
 module.exports = Battleship;
