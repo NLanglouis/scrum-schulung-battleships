@@ -1,14 +1,16 @@
 class GameController {
     static InitializeShips() {
-        var colors = require("cli-color");
+        const colors = require("cli-color");
         const Ship = require("./ship.js");
-        var ships = [
+
+        const ships = [
             new Ship("Aircraft Carrier", 5, colors.CadetBlue),
             new Ship("Battleship", 4, colors.Red),
             new Ship("Submarine", 3, colors.Chartreuse),
             new Ship("Destroyer", 3, colors.Yellow),
             new Ship("Patrol Boat", 2, colors.Orange)
         ];
+
         return ships;
     }
 
@@ -41,14 +43,13 @@ class GameController {
     }
 
     static checkWinningCondition(ships) {
-        return ships.every(function (ship) {
-            return ship.positions.every(position => {
-                return position.isHit;
-            });
-        });
+        return ships.every(ship =>
+            ship.positions.every(position => position.isHit)
+        );
     }
+
     static isShipValid(ship) {
-        return ship.positions.length == ship.size;
+        return ship.positions.length === ship.size;
     }
 }
 
