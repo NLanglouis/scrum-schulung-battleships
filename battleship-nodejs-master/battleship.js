@@ -177,12 +177,24 @@ class Battleship {
         console.log(cliColor.cyan("Select game mode:"));
         console.log("1) Player vs Computer");
         console.log("2) Player vs Player (1 vs 1)");
-        const modeInput = readline.question(cliColor.yellow("> Mode (1/2): "));
-        const mode = modeInput.trim() === '2' ? 'pvp' : 'pve';
+        console.log("3) Cheat: Player 1 instant win");
+        const modeInput = readline.question(cliColor.yellow("> Mode (1/2/3): "));
+        const trimmedMode = modeInput.trim();
+        let mode;
+        if (trimmedMode === '2') {
+            mode = 'pvp';
+        } else if (trimmedMode === '3') {
+            mode = 'cheat';
+        } else {
+            mode = 'pve';
+        }
 
         if (mode === 'pvp') {
             this.InitializeTwoPlayerGame();
             await this.StartGameTwoPlayer();
+        } else if (mode === 'cheat') {
+            console.log(cliColor.greenBright("\nCheat mode activated: Player 1 WINS!"));
+            await this.playWinAnimation();
         } else {
             this.PrintPlayingField();
             this.InitializeGame();
