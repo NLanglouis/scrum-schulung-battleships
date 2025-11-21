@@ -206,29 +206,59 @@ class Battleship {
 
     InitializeEnemyFleet() {
         this.enemyFleet = gameController.InitializeShips();
+        const gridSize = 8;
 
-        this.enemyFleet[0].addPosition(new position(letters.B, 4));
-        this.enemyFleet[0].addPosition(new position(letters.B, 5));
-        this.enemyFleet[0].addPosition(new position(letters.B, 6));
-        this.enemyFleet[0].addPosition(new position(letters.B, 7));
-        this.enemyFleet[0].addPosition(new position(letters.B, 8));
+        const usedPositions = new Set();
 
-        this.enemyFleet[1].addPosition(new position(letters.E, 6));
-        this.enemyFleet[1].addPosition(new position(letters.E, 7));
-        this.enemyFleet[1].addPosition(new position(letters.E, 8));
-        this.enemyFleet[1].addPosition(new position(letters.E, 9));
+        this.enemyFleet.forEach(ship => {
+            let placed = false;
 
-        this.enemyFleet[2].addPosition(new position(letters.A, 3));
-        this.enemyFleet[2].addPosition(new position(letters.B, 3));
-        this.enemyFleet[2].addPosition(new position(letters.C, 3));
+            while (!placed) {
+                const horizontal = Math.random() < 0.5;
 
-        this.enemyFleet[3].addPosition(new position(letters.F, 8));
-        this.enemyFleet[3].addPosition(new position(letters.G, 8));
-        this.enemyFleet[3].addPosition(new position(letters.H, 8));
+                const startCol = Math.floor(Math.random() * gridSize) + 1;
+                const startRow = Math.floor(Math.random() * gridSize) + 1;
 
-        this.enemyFleet[4].addPosition(new position(letters.C, 5));
-        this.enemyFleet[4].addPosition(new position(letters.C, 6));
+                const positions = [];
+                let valid = true;
+
+                for (let i = 0; i < ship.size; i++) {
+                    let col = startCol;
+                    let row = startRow;
+
+                    if (horizontal) {
+                        col = startCol + i;
+                    } else {
+                        row = startRow + i;
+                    }
+
+                    if (col > gridSize || row > gridSize) {
+                        valid = false;
+                        break;
+                    }
+
+                    const key = `${col}-${row}`;
+
+                    if (usedPositions.has(key)) {
+                        valid = false;
+                        break;
+                    }
+
+                    positions.push({ col, row });
+                }
+
+                if (!valid) continue;
+
+                positions.forEach(p => {
+                    usedPositions.add(`${p.col}-${p.row}`);
+                    ship.addPosition(new position(letters.get(p.col), p.row));
+                });
+
+                placed = true;
+            }
+        });
     }
+
 }
 
 module.exports = Battleship;
