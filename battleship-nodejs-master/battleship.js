@@ -85,7 +85,6 @@ class Battleship {
         console.log(cliColor.magenta(" \\_________________________________________________________________________|"));
         console.log();
 
-        await this.playWinAnimation()
 
         this.InitializeGame();
         // GEÄNDERT: await hinzugefügt
