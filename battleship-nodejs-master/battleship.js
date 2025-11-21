@@ -432,22 +432,66 @@ class Battleship {
 
     InitializeFleetForPlayer(playerLabel) {
         const fleet = gameController.InitializeShips();
+        const usedPositions = new Set();
 
-        console.log(`Please position your fleet, ${playerLabel} (Game board size is from A to H and 1 to 8) :`);
+        console.log(`Please position your fleet, ${playerLabel} (A-H / 1-8):`);
 
-        fleet.forEach((ship) => {
-            console.log();
-            console.log(`Please enter the positions for the ${ship.name} (size: ${ship.size})`);
-            for (let i = 1; i < ship.size + 1; i++) {
-                const placementPrompt = `${playerLabel} - place section ${i} of ${ship.size} for your ${ship.name}`;
-                let validPosition = this.PromptForPosition(
+        fleet.forEach(ship => {
+            console.log(`\n${playerLabel}, place your ${ship.name} (size ${ship.size})`);
+
+            let positions = [];
+
+            while (positions.length < ship.size) {
+                const placementPrompt = `${playerLabel} - section ${positions.length + 1} of ${ship.size} for your ${ship.name}`;
+                let pos = this.PromptForPosition(
                     placementPrompt,
-                    ['Ensure each section is contiguous and does not overlap other ships.'],
+                    [
+                        'Ships cannot overlap.',
+                        'Ships must be placed in a straight line.',
+                        'Ships must be contiguous.'
+                    ],
                     'Coordinate'
                 );
 
-                ship.addPosition(validPosition);
+                const key = `${pos.column}${pos.row}`;
+
+                // Überlappung prüfen
+                if (usedPositions.has(key)) {
+                    console.log(cliColor.red("❌ This position is already occupied by another ship!"));
+                    continue;
+                }
+
+                // Wenn es NICHT das erste Feld ist, prüfen wir Ausrichtung + Abstand
+                if (positions.length > 0) {
+                    const first = positions[0];
+
+                    // MUSS gleiche Spalte oder gleiche Reihe sein
+                    const sameColumn = pos.column === first.column;
+                    const sameRow = pos.row === first.row;
+
+                    if (!sameColumn && !sameRow) {
+                        console.log(cliColor.red("❌ Ships must be straight (horizontal or vertical)."));
+                        continue;
+                    }
+
+                    // Jetzt prüfen wir, ob die neue Position direkt angrenzend ist
+                    const touching = positions.some(p =>
+                        (p.column === pos.column && Math.abs(p.row - pos.row) === 1) ||
+                        (p.row === pos.row && Math.abs(p.column - pos.column) === 1)
+                    );
+
+                    if (!touching) {
+                        console.log(cliColor.red("❌ Ship positions must be contiguous (no gaps)."));
+                        continue;
+                    }
+                }
+
+                positions.push(pos);
+                usedPositions.add(key);
             }
+
+            // am Ende die Positionen ins Schiff setzen
+            positions.forEach(p => ship.addPosition(p));
         });
 
         return fleet;
