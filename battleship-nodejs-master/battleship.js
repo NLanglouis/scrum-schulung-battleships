@@ -3,7 +3,43 @@ const gameController = require("./GameController/gameController.js");
 const cliColor = require('cli-color');
 const beep = require('beepbeep');
 const position = require("./GameController/position.js");
+
 const letters = require("./GameController/letters.js");
+
+// HILFSFUNKTION FÜR PAUSEN (für die Animation)
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// HASBULLA ASCII FRAMES
+const hasbullaFrames = [
+    // Frame 0: Neutral
+    "\n" +
+    cliColor.whiteBright("       .---. \n") +
+    cliColor.whiteBright("      /     \\ \n") +
+    cliColor.whiteBright("     (  .  .  ) \n") +
+    cliColor.whiteBright("      \\   -   /  \n") +
+    cliColor.blueBright("     /|     |\\ \n") +
+    cliColor.blueBright("    / |_____| \\ \n"),
+
+    // Frame 1: Arm geht hoch
+    "\n" +
+    cliColor.whiteBright("       .---. \n") +
+    cliColor.whiteBright("      /     \\ \n") +
+    cliColor.whiteBright("     (  o  o  ) \n") +
+    cliColor.whiteBright("      \\   -   /   \n") +
+    cliColor.blueBright("      |     |\\  \n") +
+    cliColor.blueBright("    / |_____| \\ \n") +
+    cliColor.yellowBright("   d  | \n"),
+
+    // Frame 2: Daumen hoch!
+    "\n" +
+    cliColor.whiteBright("       .---.  ") + cliColor.greenBright.bold("CHAMPION!") + "\n" +
+    cliColor.whiteBright("      /  ^  \\ \n") +
+    cliColor.whiteBright("     (  ^  ^  ) \n") +
+    cliColor.whiteBright("      \\   v   /   ") + cliColor.yellowBright(" _ \n") +
+    cliColor.blueBright("      |     |   ") + cliColor.yellowBright("| | \n") +
+    cliColor.blueBright("    / |_____|   ") + cliColor.yellowBright("| | \n") +
+    cliColor.yellowBright("   d  |        d | \n")
+];
 
 // High-contrast palette keeps the grid legible on low-quality projectors.
 const GRID_THEME = {
@@ -116,7 +152,7 @@ class Battleship {
         }
     }
 
-    start() {
+    async start() {
         this.computerShotPositions = new Set(); // Initialisierung
 
         console.log("Starting...");
@@ -145,15 +181,15 @@ class Battleship {
 
         if (mode === 'pvp') {
             this.InitializeTwoPlayerGame();
-            this.StartGameTwoPlayer();
+            await this.StartGameTwoPlayer();
         } else {
             this.PrintPlayingField();
             this.InitializeGame();
-            this.StartGame();
+            await this.StartGame();
         }
     }
 
-    StartGame() {
+    async StartGame() {
         console.clear();
         console.log("                  __");
         console.log("                 /  \\");
@@ -233,19 +269,20 @@ class Battleship {
             }
             let hasTheAiWon = gameController.checkWinningCondition(this.myFleet);
             let hasHumanityWon = gameController.checkWinningCondition(this.enemyFleet);
-            if(hasTheAiWon) {
-                console.log("YOU LOST");
+            if (hasTheAiWon) {
+                console.log(cliColor.redBright("\nYOU LOST"));
                 hasSomeoneWon = true;
             }
-            if(hasHumanityWon) {
-                console.log("YOU WON");
+            if (hasHumanityWon) {
+                console.log(cliColor.greenBright("\nYOU WON"));
                 hasSomeoneWon = true;
+                await this.playWinAnimation();
             }
         }
         while (!hasSomeoneWon);
     }
 
-    StartGameTwoPlayer() {
+    async StartGameTwoPlayer() {
         console.clear();
         let hasSomeoneWon = false;
         let isPlayer1Turn = true;
@@ -279,10 +316,6 @@ class Battleship {
                 this.ShowRemainingShips(enemyFleet);
             }
 
-            telemetryWorker.postMessage({
-                eventName: 'PvP_ShootPosition',
-                properties: { Player: currentPlayerName, Position: position.toString(), IsHit: isHit }
-            });
 
             if (isHit) {
                 beep();
@@ -304,6 +337,7 @@ class Battleship {
             if (hasOpponentLost) {
                 console.log(cliColor.green(`\n${currentPlayerName} WINS!`));
                 hasSomeoneWon = true;
+                await this.playWinAnimation();
                 break;
             }
 
@@ -410,10 +444,6 @@ class Battleship {
                     ['Ensure each section is contiguous and does not overlap other ships.'],
                     'Coordinate'
                 );
-                telemetryWorker.postMessage({
-                    eventName: 'Player_PlaceShipPosition',
-                    properties: { Player: playerLabel, Position: validPosition.toString(), Ship: ship.name, PositionInShip: i }
-                });
 
                 ship.addPosition(validPosition);
             }
@@ -498,6 +528,31 @@ class Battleship {
             }
         });
     }
+    // NEUE METHODE: Hasbulla Animation
+    async playWinAnimation() {
+        console.log(cliColor.greenBright.bold("\nYOU WON! Hasbulla is impressed!"));
+        await sleep(1000); // Kurze Pause vor Start
+
+        const totalLoops = 4; // Wie oft die Animation abgespielt wird
+        const frameDelay = 400; // Geschwindigkeit der Animation in ms
+
+        for (let i = 0; i < totalLoops; i++) {
+            for (const frame of hasbullaFrames) {
+                console.clear();
+                console.log(frame);
+                beep(); // Optional: Ein Beep pro Frame Bewegung
+                await sleep(frameDelay);
+            }
+        }
+
+        // Endbildschirm
+        console.clear();
+        console.log(hasbullaFrames[2]); // Zeige den letzten Frame (Daumen hoch) dauerhaft
+        console.log(cliColor.greenBright.bold("\nCONGRATULATIONS, COMMANDER!"));
+        // Ein finaler Sieges-Beep-Sturm
+        beep(); setTimeout(beep, 200); setTimeout(beep, 400);
+    }
 }
 
 module.exports = Battleship;
+
