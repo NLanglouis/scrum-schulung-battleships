@@ -1,11 +1,9 @@
-const { Worker } = require('worker_threads');
 const readline = require('readline-sync');
 const gameController = require("./GameController/gameController.js");
 const cliColor = require('cli-color');
 const beep = require('beepbeep');
 const position = require("./GameController/position.js");
 const letters = require("./GameController/letters.js");
-let telemetryWorker;
 
 // High-contrast palette keeps the grid legible on low-quality projectors.
 const GRID_THEME = {
@@ -68,7 +66,6 @@ class Battleship {
             console.log(`${styledRowLabel} |${rowCells}|`);
             console.log(separator);
         }
-
         console.log();
     }
 
@@ -111,11 +108,9 @@ class Battleship {
     }
 
     start() {
-        telemetryWorker = new Worker("./TelemetryClient/telemetryClient.js");
         this.computerShotPositions = new Set(); // Initialisierung
 
         console.log("Starting...");
-        telemetryWorker.postMessage({eventName: 'ApplicationStarted', properties:  {Technology: 'Node.js'}});
 
         console.log(cliColor.magenta("                                     |__"));
         console.log(cliColor.magenta("                                     |\\/"));
@@ -172,7 +167,6 @@ class Battleship {
                 console.log(cliColor.red(`→ ${sunkShip.name}`));
                 this.ShowRemainingShips(this.enemyFleet);
             }
-            telemetryWorker.postMessage({eventName: 'Player_ShootPosition', properties:  {Position: position.toString(), IsHit: isHit}});
 
             if (isHit) {
                 beep();
@@ -202,9 +196,6 @@ class Battleship {
                 this.ShowRemainingShips(this.myFleet);
             }
 
-            // KORRIGIERT: Verwendet jetzt computerIsHit statt isHit
-            telemetryWorker.postMessage({eventName: 'Computer_ShootPosition', properties:  {Position: computerPos.toString(), IsHit: computerIsHit}});
-
             console.log();
             console.log(`Computer shot in ${computerPos.column}${computerPos.row} and ` + (computerIsHit ? `has hit your ship !` : `miss`));
             if (computerIsHit) {
@@ -219,7 +210,7 @@ class Battleship {
                 console.log("                 -\\  \\     /  /-");
                 console.log("                   \\  \\   /  /");
             }
-            let hasTheAiWon = gameController.checkWinningCondition(this.myFleet);
+            let hasTheAiWon = gameController.checkWinningCondition(this.enemyFleet);
             let hasHumanityWon = gameController.checkWinningCondition(this.enemyFleet);
             if(hasTheAiWon) {
                 console.log("YOU LOST");
@@ -314,8 +305,6 @@ class Battleship {
                     ['Ensure each section is contiguous and does not overlap other ships.'],
                     'Coordinate'
                 );
-                telemetryWorker.postMessage({eventName: 'Player_PlaceShipPosition', properties:  {Position: validPosition.toString(), Ship: ship.name, PositionInShip: i}});
-
                 ship.addPosition(validPosition);
             }
         }, this)
